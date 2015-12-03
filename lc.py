@@ -262,7 +262,7 @@ class LC(object):
 
     def writeFits(self, filename, id):
         # fit_lc fit
-        if self.fitOut:
+        if self.fitRes:
             fit_errors = self.fitRes.errors
 
             fit_table = Table()
