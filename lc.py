@@ -7,12 +7,13 @@ import collections
 
 class LC(object):
     """class to streamline light curve fits with SNCosmo """
-    def __init__(self, model, vparams, data_file='sn.dat', truths=None):
+    def __init__(self, model, data, vparams, bounds={'c':(-0.3, 0.3), 'x1':(-3.0, 3.0)}, truths=None):
         # super(, self).__init__()  <-- don't need this yet
 
         self.model = model
-        self.data = sncosmo.read_lc(data_file)
+        self.data = data
         self.vparams = vparams
+        self.bounds = bounds
 
         self._fitOut = None
         self.fitRes = None
@@ -26,6 +27,9 @@ class LC(object):
         self.nestRes = None
         self.nestModel = None
 
+        # variables for time statistics
+
+
     @property
     def fitOut(self):
         return self.fitOut
@@ -36,7 +40,7 @@ class LC(object):
             print "running chi^2 fit"
 
             self._fitOut = sncosmo.fit_lc(self.data, self.model, vparam_names=self.vparams,
-                                        bounds={'c':(-0.3, 0.3), 'x1':(-3.0, 3.0)}, minsnr=3.0)
+                                        bounds=self.bounds, minsnr=3.0)
             self.fitRes = self._fitOut[0]
             self.fitModel = self._fitOut[1]
 
@@ -45,8 +49,14 @@ class LC(object):
     @fitOut.setter
     def fitOut(self, val):
         self._fitOut = val
-        self.fitRes = self._fitOut[0]
-        self.fitModel = self._fitOut[1]
+
+        if val:
+            self.fitRes = self._fitOut[0]
+            self.fitModel = self._fitOut[1]
+
+        else:
+            self.fitRes = None
+            self.fitmode = None
 
         return self._fitOut
 
@@ -60,7 +70,7 @@ class LC(object):
             print "running MCMC fit"
 
             self._mcmcOut = sncosmo.mcmc_lc(self.data, self.model, vparam_names=self.vparams,
-                                        bounds={'c':(-0.3, 0.3), 'x1':(-3.0, 3.0)}, minsnr=3.0)
+                                        bounds=self.bounds, minsnr=3.0)
             self.mcmcRes = self._mcmcOut[0]
             self.mcmcModel = self._mcmcOut[1]
 
@@ -69,9 +79,14 @@ class LC(object):
     @mcmcOut.setter
     def mcmcOut(self, val):
         self._mcmcOut = val
-        self.mcmcRes = self._mcmcOut[0]
-        self.mcmcModel = self._mcmcOut[1]
 
+        if val:
+            self.mcmcRes = self._mcmcOut[0]
+            self.mcmcModel = self._mcmcOut[1]
+
+        else:
+            self.mcmcRes = None
+            self.mcmcModel = None
         return self._mcmcOut
 
     @property
@@ -84,7 +99,7 @@ class LC(object):
             print "running nest fit"
 
             self._nestOut = sncosmo.nest_lc(self.data, self.model, vparam_names=self.vparams,
-                                    bounds={'c':(-0.3, 0.3), 'x1':(-3.0, 3.0)}, guess_amplitude_bound=True,
+                                    bounds=self.bounds, guess_amplitude_bound=True,
                                      minsnr=3.0, verbose=True)
             self.nestRes = self._nestOut[0]
             self.nestModel = self._nestOut[1]
@@ -94,8 +109,14 @@ class LC(object):
     @nestOut.setter
     def nestOut(self, val):
         self._nestOut = val
-        self.nestRes = self._nestOut[0]
-        self.nestModel = self._nestOut[1]
+
+        if val:
+            self.nestRes = self._nestOut[0]
+            self.nestModel = self._nestOut[1]
+
+        else:
+            self.nestRes = None
+            self.nestModel = None
 
         return self._nestOut
 
@@ -103,10 +124,47 @@ class LC(object):
 #methods
 #--------------
 
+# functions for changing various parameters
+    def reset(fit):
+        pass
+
+    def reset_all(self):
+        self._fitOut = None;
+        self._mcmcOut = None;
+        self._nestOut = None;
+
+        return
+
+    def setBounds(self, new_bounds):
+        self.bounds = new_bounds
+
+        # resets fits now that bounds have changed
+        self._fitOut = None;
+        self._mcmcOut = None;
+        self._nestOut = None;
+
+        return
+
+    def rerunFits(self):
+        if not self.fitRes:
+            print "fit_lc() output reran"
+            self.fitRes = self._fitOut[0]
+            self.fitModel = self._fitOut[1]
+
+        if not self.mcmcRes:
+            print "mcmc_lc() output reran"
+            self.mcmcRes = self._mcmcOut[0]
+            self.mcmcModel = self._mcmcOut[1]
+
+        if not self.nestRes:
+            print "nest_lc() output reran"
+            self.nestRes = self._nestOut[0]
+            self.nestModel = self._nestOut[1]
+
 # io functions
-    def readFits(self, filename):
+    def readFits(self, filename, id):
         # fit_lc fit
-        fit_read = Table.read(filename, 'MLEfit')
+        fit_read = Table.read(filename, id + '_MLEfit')
 
         fit_errors_dict = collections.OrderedDict()
         for colnames in fit_read.colnames:
@@ -118,7 +176,7 @@ class LC(object):
         fit_result = sncosmo.utils.Result(fit_dict)
 
         # mcmc_lc fit
-        mcmc_read = Table.read(filename, 'mcmc')
+        mcmc_read = Table.read(filename, id + '_mcmc')
 
         mcmc_errors_dict = collections.OrderedDict()
         for colnames in mcmc_read.colnames:
@@ -138,7 +196,7 @@ class LC(object):
         mcmc_result = sncosmo.utils.Result(mcmc_dict)
 
         # nest_lc fit
-        nest_read = Table.read(filename, 'nest')
+        nest_read = Table.read(filename, id + '_nest')
 
         nest_param_dict = collections.OrderedDict()
 
@@ -202,62 +260,65 @@ class LC(object):
 
         return fitOut, mcmcOut, nestOut
 
-    def writeFits(self, filename):
+    def writeFits(self, filename, id):
         # fit_lc fit
-        fit_errors = self.fitRes.errors
+        if self.fitOut:
+            fit_errors = self.fitRes.errors
 
-        fit_table = Table()
+            fit_table = Table()
 
-        for keys in fit_errors:
-            fit_table[keys] = [fit_errors[keys]]
+            for keys in fit_errors:
+                fit_table[keys] = [fit_errors[keys]]
 
-        for key in self.fitRes.keys():
-            if key == 'errors':
-                continue
-            fit_table.meta[key] = self.fitRes[key]
+            for key in self.fitRes.keys():
+                if key == 'errors':
+                    continue
+                fit_table.meta[key] = self.fitRes[key]
 
-        fit_table.write(filename, "MLEfit")
+            fit_table.write(filename, id + '_MLEfit', append=True)
 
         # mcmc_lc fit
-        mcmc_errors = self.mcmcRes.errors
-        mcmc_table = Table(self.mcmcRes.samples, names=self.mcmcRes.vparam_names)
+        if self.mcmcRes:
+            mcmc_errors = self.mcmcRes.errors
+            mcmc_table = Table(self.mcmcRes.samples, names=self.mcmcRes.vparam_names)
 
-        for key in self.mcmcRes.keys():
-            if key == 'errors' or key =='samples':
-                continue
-            mcmc_table.meta[key] = self.mcmcRes[key]
+            for key in self.mcmcRes.keys():
+                if key == 'errors' or key =='samples':
+                    continue
+                mcmc_table.meta[key] = self.mcmcRes[key]
 
-        mcmc_table.add_row(mcmc_errors.values())
-        mcmc_table.write(filename, 'mcmc', append=True)
+            mcmc_table.add_row(mcmc_errors.values())
+            mcmc_table.write(filename, id + '_mcmc', append=True)
 
             # nest_lc fit
-        nest_errors = self.nestRes.errors
-        nest_param_dict = self.nestRes.param_dict
-        nest_bounds = self.nestRes.bounds
+        if self.nestRes:
+            nest_errors = self.nestRes.errors
+            nest_param_dict = self.nestRes.param_dict
+            nest_bounds = self.nestRes.bounds
 
-        nest_table = Table(self.nestRes.samples, names=self.nestRes.vparam_names)
+            nest_table = Table(self.nestRes.samples, names=self.nestRes.vparam_names)
 
-        for key in self.nestRes.keys():
-            if key == 'errors' or key =='samples' or key =='param_dict' or key == 'bounds':
-                continue
-            nest_table.meta[key] = self.nestRes[key]
+            for key in self.nestRes.keys():
+                if key == 'errors' or key =='samples' or key =='param_dict' or key == 'bounds':
+                    continue
+                nest_table.meta[key] = self.nestRes[key]
 
-        nest_table.add_row(nest_errors.values())
+            nest_table.add_row(nest_errors.values())
 
-        temp_z = np.zeros((len(nest_table['t0'])))
-        col_z = Table.Column(name='z', data=temp_z)
-        nest_table.add_column(col_z)
+            temp_z = np.zeros((len(nest_table['t0'])))
+            col_z = Table.Column(name='z', data=temp_z)
+            nest_table.add_column(col_z)
 
-        param_list = []
-        for colname in nest_table.colnames:
-            param_list.append(nest_param_dict[colname])
+            param_list = []
+            for colname in nest_table.colnames:
+                param_list.append(nest_param_dict[colname])
 
-        nest_table.add_row(param_list)
+            nest_table.add_row(param_list)
 
-        for key in nest_bounds.keys():
-            nest_table.meta[key] = nest_bounds[key]
+            for key in nest_bounds.keys():
+                nest_table.meta[key] = nest_bounds[key]
 
-        nest_table.write(filename, 'nest', append=True)
+            nest_table.write(filename, id + '_nest', append=True)
 
         return
 
@@ -269,12 +330,20 @@ class LC(object):
         mcmc_model = self.mcmcModel
         nest_model = self.nestModel
 
+        models = [model]
+        model_names = ['model']
         if fits:
-            models=[model, fit_model, mcmc_model, nest_model]
-        else:
-            models=[model]
+            if fit_model:
+                models.append(fit_model)
+                model_names.append('MLE')
+            if mcmc_model:
+                models.append(mcmc_model)
+                model_names.append('MCMC')
+            if nest_model:
+                models.append(nest_model)
+                model_names.append('nest')
 
-        fig = sncosmo.plot_lc(data, model=models)
+        fig = sncosmo.plot_lc(data, model=models, model_label=model_names)
 
         return fig
 
@@ -315,8 +384,8 @@ class LC(object):
         return figure_mcmc, figure_nest
 
     def plotTrace(self):
-        mcmcVParams = self.mcmcRes.vparam_names
-        nestVParams = self.nestRes.vparam_names
+        mcmc_vparams = self.mcmcRes.vparam_names
+        nest_vparams = self.nestRes.vparam_names
 
         mcmcSamples = self.mcmcRes.samples
         nestSamples = self.nestRes.samples
@@ -338,20 +407,20 @@ class LC(object):
         mcmc3.plot(mcmcSamples[:,2])
         mcmc4.plot(mcmcSamples[:,3])
 
-        mcmc1.set_title('mcmc: ' + mcmcVParams[0])
-        mcmc2.set_title('mcmc: ' + mcmcVParams[1])
-        mcmc3.set_title('mcmc: ' + mcmcVParams[2])
-        mcmc4.set_title('mcmc: ' + mcmcVParams[3])
+        mcmc1.set_title('mcmc: ' + mcmc_vparams[0])
+        mcmc2.set_title('mcmc: ' + mcmc_vparams[1])
+        mcmc3.set_title('mcmc: ' + mcmc_vparams[2])
+        mcmc4.set_title('mcmc: ' + mcmc_vparams[3])
 
         nest1.plot(nestSamples[:,0])
         nest2.plot(nestSamples[:,1])
         nest3.plot(nestSamples[:,2])
         nest4.plot(nestSamples[:,3])
 
-        nest1.set_title('nest: ' + nestVParams[0])
-        nest2.set_title('nest: ' + nestVParams[1])
-        nest3.set_title('nest: ' + nestVParams[2])
-        nest4.set_title('nest: ' + nestVParams[3])
+        nest1.set_title('nest: ' + nest_vparams[0])
+        nest2.set_title('nest: ' + nest_vparams[1])
+        nest3.set_title('nest: ' + nest_vparams[2])
+        nest4.set_title('nest: ' + nest_vparams[3])
 
         trace_fig.tight_layout()
 
