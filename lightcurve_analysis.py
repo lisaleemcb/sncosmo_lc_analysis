@@ -2,10 +2,11 @@ import sncosmo
 import triangle
 from astropy.table import Table
 import matplotlib.pyplot as plt
+import matplotlib.mlab as mlab
 import numpy as np
 import collections
 
-class LC(object):
+class LCA(object):
     """class to streamline light curve fits with SNCosmo """
     def __init__(self, model, data, vparams, bounds={'c':(-0.3, 0.3), 'x1':(-3.0, 3.0)}, truths=None):
         # super(, self).__init__()  <-- don't need this yet
@@ -39,8 +40,7 @@ class LC(object):
         if self._fitOut is None:
             print "running chi^2 fit"
 
-            self._fitOut = sncosmo.fit_lc(self.data, self.model, vparam_names=self.vparams,
-                                        bounds=self.bounds, minsnr=3.0)
+            self._fitOut = self.runMLE()
             self.fitRes = self._fitOut[0]
             self.fitModel = self._fitOut[1]
 
@@ -69,8 +69,7 @@ class LC(object):
         if self._mcmcOut is None:
             print "running MCMC fit"
 
-            self._mcmcOut = sncosmo.mcmc_lc(self.data, self.model, vparam_names=self.vparams,
-                                        bounds=self.bounds, minsnr=3.0)
+            self._mcmcOut = self.runMCMC()
             self.mcmcRes = self._mcmcOut[0]
             self.mcmcModel = self._mcmcOut[1]
 
@@ -98,9 +97,7 @@ class LC(object):
         if self._nestOut is None:
             print "running nest fit"
 
-            self._nestOut = sncosmo.nest_lc(self.data, self.model, vparam_names=self.vparams,
-                                    bounds=self.bounds, guess_amplitude_bound=True,
-                                     minsnr=3.0, verbose=True)
+            self._nestOut = self.runNest()
             self.nestRes = self._nestOut[0]
             self.nestModel = self._nestOut[1]
 
@@ -124,11 +121,31 @@ class LC(object):
 #methods
 #--------------
 
-# functions for changing various parameters
+# functions for changing aspects of fits
+    def runMLE(self):
+        MLEout = sncosmo.fit_lc(self.data, self.model, vparam_names=self.vparams,
+                                    bounds=self.bounds, minsnr=3.0)
+
+        return MLEout
+
+
+    def runMCMC(self):
+        MCMCout = sncosmo.mcmc_lc(self.data, self.model, vparam_names=self.vparams,
+                                    bounds=self.bounds, minsnr=3.0)
+
+        return MCMCout
+
+    def runNest(self):
+        nestOut = sncosmo.nest_lc(self.data, self.model, vparam_names=self.vparams,
+                                bounds=self.bounds, guess_amplitude_bound=True,
+                                 minsnr=3.0, verbose=True)
+
+        return nestOut
+
     def reset(fit):
         pass
 
-    def reset_all(self):
+    def resetAll(self):
         self._fitOut = None;
         self._mcmcOut = None;
         self._nestOut = None;
@@ -147,6 +164,7 @@ class LC(object):
 
     def rerunFits(self):
         if not self.fitRes:
+            # add run function
             print "fit_lc() output reran"
             self.fitRes = self._fitOut[0]
             self.fitModel = self._fitOut[1]
@@ -322,6 +340,23 @@ class LC(object):
 
         return
 
+    @staticmethod
+    def writeIDs(filename, ids):
+        # is this bad practice?
+        names='ids'
+        id_table = Table([ids], names=(names,))
+        id_table.write(filename, 'ids', append=True)
+
+        return
+
+    @staticmethod
+    def readIDs(filename,):
+        names='ids'
+        id_read = Table.read(filename, names)
+        id_list = list(id_read['ids'])
+
+        return id_list
+
 # visualization functions
     def plotLC(self, fits=True):
         data = self.data
@@ -365,7 +400,47 @@ class LC(object):
                      truths=[model.get(mcmcVParams[0]), model.get(mcmcVParams[1]),
                              model.get(mcmcVParams[2]), model.get(mcmcVParams[3])],
                      range=mcmc_ndim*[0.9999],
-                     show_titles=True, title_args={"fontsize": 12})
+                     show_titles=True, title_args={"fontsize": 12}, hist_kwargs={'normed':True, 'color':'r'})
+
+        figure_mcmc.gca().annotate("mcmc sampling", xy=(0.5, 1.0), xycoords="figure fraction",
+                  xytext=(0, -5), textcoords="offset points",
+                  ha="center", va="top")
+
+        axes = figure_mcmc.axes
+        axes[0].hist(mcmcSamples[:,0], bins=20, normed=True)
+        axes[5].hist(mcmcSamples[:,1], bins=20, normed=True)
+
+        figure_nest = triangle.corner(nestSamples, labels=[nestVParams[0], nestVParams[1], nestVParams[2], nestVParams[3]],
+                     truths=[model.get(nestVParams[0]), model.get(nestVParams[1]),
+                             model.get(nestVParams[2]), model.get(nestVParams[3])],
+                     weights=self.nestRes.weights, range=nest_ndim*[0.9999],
+                     show_titles=True, title_args={"fontsize": 12}, hist_kwargs={'normed':True, 'color':'b'})
+
+        figure_nest.gca().annotate("nest sampling", xy=(0.5, 1.0), xycoords="figure fraction",
+                  xytext=(0, -5), textcoords="offset points",
+                  ha="center", va="top")
+
+        return figure_mcmc, figure_nest
+
+    def plotOneCorner(self):
+        model = self.model
+
+        mcmcVParams = self.mcmcRes.vparam_names
+        nestVParams = self.nestRes.vparam_names
+
+        mcmcSamples = self.mcmcRes.samples
+        nestSamples = self.nestRes.samples
+
+        mcmc_ndim, mcmc_nsamples = len(mcmcVParams), len(mcmcSamples)
+        nest_ndim, nest_nsamples = len(nestVParams), len(nestSamples)
+
+        # make figure
+
+        figure_mcmc = triangle.corner(mcmcSamples, labels=[mcmcVParams[0], mcmcVParams[1], mcmcVParams[2], mcmcVParams[3]],
+                     truths=[model.get(mcmcVParams[0]), model.get(mcmcVParams[1]),
+                             model.get(mcmcVParams[2]), model.get(mcmcVParams[3])],
+                     range=mcmc_ndim*[0.9999],
+                     show_titles=True, title_args={"fontsize": 12}, hist_kwargs={'normed':True, 'color':'r'})
 
         figure_mcmc.gca().annotate("mcmc sampling", xy=(0.5, 1.0), xycoords="figure fraction",
                   xytext=(0, -5), textcoords="offset points",
@@ -375,13 +450,21 @@ class LC(object):
                      truths=[model.get(nestVParams[0]), model.get(nestVParams[1]),
                              model.get(nestVParams[2]), model.get(nestVParams[3])],
                      weights=self.nestRes.weights, range=nest_ndim*[0.9999],
-                     show_titles=True, title_args={"fontsize": 12})
+                     show_titles=True, title_args={"fontsize": 12}, hist_kwargs={'normed':True, 'color':'b'},
+                     fig=figure_mcmc, **{'color':'r'})
 
         figure_nest.gca().annotate("nest sampling", xy=(0.5, 1.0), xycoords="figure fraction",
                   xytext=(0, -5), textcoords="offset points",
                   ha="center", va="top")
 
-        return figure_mcmc, figure_nest
+        return figure_nest
+
+    def plotMLEGaussian(self):
+            mean = 0
+            variance = 1
+            sigma = math.sqrt(variance)
+            x = np.linspace(-3,3,100)
+            plt.plot(x,mlab.normpdf(x,mean,sigma))
 
     def plotTrace(self):
         mcmc_vparams = self.mcmcRes.vparam_names
