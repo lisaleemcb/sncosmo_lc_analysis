@@ -142,8 +142,13 @@ class LCA(object):
 
         return nestOut
 
-    def reset(fit):
-        pass
+    def resetFit(self, fit):
+        if fit is 'MLE':
+            self._fitOut = None;
+        if fit is 'MCMC':
+            self._mcmcOut = None;
+        if fit is 'nest':
+            self._nestOut = None;
 
     def resetAll(self):
         self._fitOut = None;
@@ -180,6 +185,23 @@ class LCA(object):
             self.nestModel = self._nestOut[1]
 
 # io functions
+    @staticmethod
+    def writeIDs(filename, ids):
+        # is this bad practice?
+        names='ids'
+        id_table = Table([ids], names=(names,))
+        id_table.write(filename, 'ids', append=True)
+
+        return
+
+    @staticmethod
+    def readIDs(filename,):
+        names='ids'
+        id_read = Table.read(filename, names)
+        id_list = list(id_read['ids'])
+
+        return id_list
+
     def readFits(self, filename, id):
         # fit_lc fit
         fit_read = Table.read(filename, id + '_MLEfit')
@@ -340,22 +362,11 @@ class LCA(object):
 
         return
 
-    @staticmethod
-    def writeIDs(filename, ids):
-        # is this bad practice?
-        names='ids'
-        id_table = Table([ids], names=(names,))
-        id_table.write(filename, 'ids', append=True)
+    def readPacket(self, filename):
+        pass
 
-        return
-
-    @staticmethod
-    def readIDs(filename,):
-        names='ids'
-        id_read = Table.read(filename, names)
-        id_list = list(id_read['ids'])
-
-        return id_list
+    def writePacket(self, filename):
+        pass
 
 # visualization functions
     def plotLC(self, fits=True):
@@ -422,7 +433,7 @@ class LCA(object):
 
         return figure_mcmc, figure_nest
 
-    def plotOneCorner(self):
+    def plotCorner(self):
         model = self.model
 
         mcmcVParams = self.mcmcRes.vparam_names
