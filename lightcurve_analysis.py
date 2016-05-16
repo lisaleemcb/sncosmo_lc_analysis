@@ -219,42 +219,43 @@ class LCA(object):
 
         mcmc_result = sncosmo.utils.Result(mcmc_dict)
 
-        # nest_lc fit
-        nest_read = Table.read(filename, id + '_nest')
+        run_nest = False
+        if run_nest is True:# nest_lc fit
+            nest_read = Table.read(filename, id + '_nest')
 
-        nest_param_dict = collections.OrderedDict()
+            nest_param_dict = collections.OrderedDict()
 
-        for colnames in nest_read.colnames:
-            nest_param_dict[colnames] = nest_read[colnames][len(nest_read.columns[0]) - 1]
+            for colnames in nest_read.colnames:
+                nest_param_dict[colnames] = nest_read[colnames][len(nest_read.columns[0]) - 1]
 
-        nest_read.remove_row(len(nest_read.columns[0]) - 1)
-        nest_read.remove_column('z')
+            nest_read.remove_row(len(nest_read.columns[0]) - 1)
+            nest_read.remove_column('z')
 
-        nest_errors_dict = collections.OrderedDict()
+            nest_errors_dict = collections.OrderedDict()
 
-        for colnames in nest_read.colnames:
-            nest_errors_dict[colnames] = nest_read[colnames][len(nest_read.columns[0]) - 1]
+            for colnames in nest_read.colnames:
+                nest_errors_dict[colnames] = nest_read[colnames][len(nest_read.columns[0]) - 1]
 
-        nest_read.remove_row(len(nest_read.columns[0]) - 1)
+            nest_read.remove_row(len(nest_read.columns[0]) - 1)
 
-        nest_samples = np.array([np.array(nest_read.columns[0]),
+            nest_samples = np.array([np.array(nest_read.columns[0]),
                          np.array(nest_read.columns[1]),
                          np.array(nest_read.columns[2]),
                          np.array(nest_read.columns[3])])
 
-        nest_bounds = {}
+            nest_bounds = {}
 
-        for colnames in nest_read.colnames:
-            nest_bounds[colnames] = tuple(nest_read.meta[colnames])
-            del nest_read.meta[colnames]
+            for colnames in nest_read.colnames:
+                nest_bounds[colnames] = tuple(nest_read.meta[colnames])
+                del nest_read.meta[colnames]
 
-        nest_dict = nest_read.meta
-        nest_dict['errors'] = nest_errors_dict
-        nest_dict['param_dict'] = nest_param_dict
-        nest_dict['samples'] = nest_samples.T
-        nest_dict['bounds'] = nest_bounds
+            nest_dict = nest_read.meta
+            nest_dict['errors'] = nest_errors_dict
+            nest_dict['param_dict'] = nest_param_dict
+            nest_dict['samples'] = nest_samples.T
+            nest_dict['bounds'] = nest_bounds
 
-        nest_result = sncosmo.utils.Result(nest_dict)
+            nest_result = sncosmo.utils.Result(nest_dict)
 
         # now make new models instances for each fit
         count = np.arange(len(fit_result.parameters))
@@ -267,7 +268,7 @@ class LCA(object):
         for number in count:
             mcmc_model_params[mcmc_result.param_names[number]] = mcmc_result.parameters[number]
 
-        nest_model_params = nest_result.param_dict
+        # nest_model_params = nest_result.param_dict
 
         fit_model = sncosmo.Model(source='salt2-extended')
         fit_model.set(**fit_model_params)
@@ -275,14 +276,14 @@ class LCA(object):
         mcmc_model = sncosmo.Model(source='salt2-extended')
         mcmc_model.set(**mcmc_model_params)
 
-        nest_model = sncosmo.Model(source='salt2-extended')
-        nest_model.set(**nest_model_params)
+        # nest_model = sncosmo.Model(source='salt2-extended')
+        # nest_model.set(**nest_model_params)
 
         fit_out = (fit_result, fit_model)
         mcmc_out = (mcmc_result, mcmc_model)
-        nest_out = (nest_result, nest_model)
+        # nest_out = (nest_result, nest_model)
 
-        return fit_out, mcmc_out, nest_out
+        return fit_out, mcmc_out
 
     def write_fits(self, filename, id):
         # fit_lc fit
