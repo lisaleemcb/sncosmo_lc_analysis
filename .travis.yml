@@ -1,7 +1,12 @@
 language: python
 python:
-- 2.7
+    - "2.7"
+install:
+    - git clone git://github.com/astropy/ci-helpers.git
+    - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
+    - conda install nose
+    - conda install pandas
+    - conda install sncosmo
+    - python setup.py install --user
 script:
-- echo 'Hello world'
-- echo `ls`
-
+    - nosetests -s --with-coverage --cover-package=sncosmo_lc_analysis

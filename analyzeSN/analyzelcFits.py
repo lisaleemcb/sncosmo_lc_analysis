@@ -3,11 +3,11 @@
 classes and methods to analyze the outputs of light curve characterization
 routines, particularly for SALT2 light curves
 """
-
+from __future__ import absolute_import
 import numpy as np
 import pandas as pd
 from copy import deepcopy
-import cov_utils as cutils
+from . import cov_utils as cutils
 
 __all__ = ['ResChar']
 class ResChar(object):
