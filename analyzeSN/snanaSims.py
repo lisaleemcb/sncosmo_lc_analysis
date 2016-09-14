@@ -80,7 +80,7 @@ class SnanaSims(object):
         data = sncosmo.read_snana_fits(head_file=headfile,
                                        phot_file=photfile,
                                        snids=snids, n=n)
-        return cls(headfile=headfile, photfile=photfile, snids=snids,
+        return cls(headFile=headfile, photFile=photfile, snids=snids,
                    n=n)
 
     @staticmethod

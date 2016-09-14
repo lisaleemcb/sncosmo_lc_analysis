@@ -1,5 +1,6 @@
 # Analysis of SN light Curves
 
+[![Build Status](https://travis-ci.org/rbiswas4/sncosmo_lc_analysis.svg?branch=master)](https://travis-ci.org/rbiswas4/sncosmo_lc_analysis)
 ## Installation
 
 ```
